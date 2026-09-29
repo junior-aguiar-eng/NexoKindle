@@ -1,0 +1,30 @@
+# Livros, derivados e segredos locais
+*.azw
+*.azw3
+*.mobi
+*.kfx
+*.kfx-zip
+*.epub
+*.pdf
+*.k4i
+*.keyfile
+input_books/
+output_pdfs/
+outputs/
+Kindle for Windows Content/
+
+# Ambiente e artefatos de desenvolvimento
+.venv/
+.tmp/
+artifacts/
+build/
+dist/
+KindlePDF.spec
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+*.voucher
+*.db

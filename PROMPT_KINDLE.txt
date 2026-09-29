@@ -1,0 +1,14 @@
+/plan Crie um projeto estruturado em Python para automatizar a extração e conversão de livros do meu Kindle (formatos .azw3 ou .mobi) para arquivos PDF funcionais e bem formatados.
+
+### Diretrizes de Arquitetura:
+1. Etapa de Descriptografia: Crie uma rotina que utilize scripts baseados no NoDRM/DeDRM para remover a proteção de arquivos locais, exigindo como parâmetro a chave do dispositivo ou número de série fornecido pelo usuário.
+2. Etapa de Unpack: Use a abordagem do KindleUnpack (ou bibliotecas similares como EbookLib) para extrair o HTML, CSS e mídias internas do arquivo descriptografado.
+3. Etapa de Renderização: Utilize a biblioteca Weasyprint para compilar o HTML/CSS extraído em um arquivo PDF final de alta qualidade, garantindo que as quebras de página e folhas de estilo sejam respeitadas.
+
+### Entregáveis Esperados:
+- Crie um arquivo `requirements.txt` com todas as dependências necessárias.
+- Monte uma estrutura de pastas organizada (ex: `/src`, `/input_books`, `/output_pdfs`).
+- Desenvolva um script principal `main.py` unificando o fluxo através de uma interface de linha de comando (CLI) simples.
+- Implemente uma validação automatizada após a geração para verificar se o PDF foi criado com sucesso.
+
+Por favor, monte o plano de implementação detalhado e aguarde minha revisão antes de criar os arquivos.
