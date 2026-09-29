@@ -95,7 +95,7 @@ def test_windows_chain_rejects_external_key_cache_without_running_tool(tmp_path:
         run_command=lambda *a, **kw: calls.append(a) or 0, archiver_sha256=None,
     )
     result = adapter.decrypt(source, tmp_path / "scratch", SecretInput("LOCAL-SESSION-ONLY"))
-    assert result.status == "unsupported"
+    assert result.status == "external_key_cache"
     assert calls == []
 
 

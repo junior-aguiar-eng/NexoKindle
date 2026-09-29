@@ -218,6 +218,7 @@ class KindlePdfWindow(QMainWindow):
         self.progress_bar.setValue(0)
         layout.addWidget(self.progress_bar)
         self.status_label = QLabel("Selecione ao menos um livro.")
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
         actions = QHBoxLayout()
@@ -418,11 +419,16 @@ class KindlePdfWindow(QMainWindow):
             self.status_label.setText(f"Cancelado após {len(report.results)} de {len(self._sources)} livro(s).")
         elif len(report.results) == 1:
             result = report.results[0]
+            if "Adaptador: external_key_cache." in result.diagnostics:
+                self.status_label.setText(
+                    "Conversão indisponível neste PC: o cache de chaves do Kindle existe e a ferramenta atual "
+                    "o copiaria para fora da área temporária. Nenhum PDF foi criado.")
+                return
             messages = {
                 "converted": "PDF pronto. Clique em Abrir PDF.",
                 "review_required": "Revisão necessária: o PDF gerado não foi aprovado na validação.",
                 "unsupported": "Este livro não é compatível com a conversão atual.",
-                "protected_or_unreadable": "O livro está protegido ou incompleto; não foi possível convertê-lo.",
+                "protected_or_unreadable": "Não foi possível converter este livro nesta instalação.",
                 "failed": "Falha ao converter este livro. Confira se está baixado por completo.",
             }
             self.status_label.setText(messages[result.status])

@@ -138,6 +138,20 @@ def test_nonfinal_result_is_visible_and_review_pdf_cannot_open(qapp, tmp_path: P
     window.close()
 
 
+def test_external_key_cache_block_has_specific_message(qapp, tmp_path: Path) -> None:
+    book = tmp_path / "book.azw"
+    book.write_bytes(b"EA DRMION data")
+    window = KindlePdfWindow()
+    result = ConversionResult(book.resolve(), "test-hash", "protected_or_unreadable", None,
+                              None, ("Adaptador: external_key_cache.",))
+
+    window._on_done(BatchReport((result,), 0, tmp_path / "batch.json"))
+
+    assert "cache de chaves" in window.status_label.text().lower()
+    assert "incompleto" not in window.status_label.text().lower()
+    window.close()
+
+
 def test_protected_book_refuses_onedrive_destination(qapp, monkeypatch, tmp_path: Path) -> None:
     source = tmp_path / "BOOK_EBOK" / "BOOK_EBOK.azw"
     source.parent.mkdir()

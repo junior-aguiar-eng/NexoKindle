@@ -11,4 +11,6 @@ Na interface, clique em **Selecionar livro** para escolher um livro já baixado 
 
 O candidato local completo inclui o arquivador validado, Calibre Portable e KFX Input em `tools`, e a interface escolhe a rota protegida automaticamente. O Kindle precisa estar instalado, com o livro baixado no computador e a conta configurada no próprio Kindle. O KindlePDF não acessa a conta Amazon nem baixa livros. A combinação protegida foi validada apenas com Kindle para Windows `1.0.25218.0` x64.
 
+Se o Kindle tiver criado o cache de chaves `PCPKSP` no perfil, a versão atual do arquivador tentaria copiá-lo para outra pasta persistente. Nesse caso, o KindlePDF interrompe a conversão antes de executar a ferramenta e informa o motivo. O PDF não é criado; não apague nem mova o cache do Kindle. A conversão protegida não funciona em todas as instalações Windows.
+
 O aplicativo foi testado somente na estação Windows 11 de desenvolvimento. A distribuição externa depende de licença de redistribuição comprovada para o arquivador, inventário das demais dependências e teste em Windows limpo. Os arquivos de licença localizados estão em `LICENSES` e no Calibre, mas o inventário ainda é incompleto; a matriz está em `RELEASE-MATRIX.md`.

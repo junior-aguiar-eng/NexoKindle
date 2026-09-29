@@ -8,7 +8,9 @@ from typing import Literal, Protocol, SupportsIndex
 
 from .detect import detect_book
 
-DecryptStatus = Literal["decrypted", "unsupported", "invalid_credential", "failed"]
+DecryptStatus = Literal[
+    "decrypted", "unsupported", "external_key_cache", "invalid_credential", "failed",
+]
 
 
 class SecretInput:
@@ -58,7 +60,9 @@ def diagnose_protected(input_path: Path, credential: SecretInput, output_dir: Pa
             if not isinstance(candidate, DecryptResult):
                 return DecryptResult("failed")
             if candidate.status != "decrypted":
-                if candidate.status in {"unsupported", "invalid_credential", "failed"}:
+                if candidate.status in {
+                    "unsupported", "external_key_cache", "invalid_credential", "failed",
+                }:
                     return DecryptResult(candidate.status)
                 return DecryptResult("failed")
             if candidate.output_path is None:

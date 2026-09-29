@@ -139,3 +139,21 @@ def test_direct_diagnosis_removes_adapter_partial_files_on_failure(tmp_path: Pat
     result = diagnose_protected(source, SecretInput("PRIVATE-TEST-KEY"), destination, PartialAdapter())
     assert result.status == "failed"
     assert not list(destination.rglob("*"))
+
+
+def test_external_key_cache_reason_reaches_result_without_sensitive_details(tmp_path: Path) -> None:
+    source = protected_sample(tmp_path / "book.azw")
+
+    class CacheBlockedAdapter:
+        def decrypt(self, input_path, output_dir, credential):
+            return DecryptResult("external_key_cache")
+
+    output = tmp_path / "pdfs"
+    report = convert_batch([source], output, ConvertOptions(
+        decrypt_adapter=CacheBlockedAdapter(), credential=SecretInput("PRIVATE-TEST-KEY")))
+
+    assert report.results[0].status == "protected_or_unreadable"
+    assert report.results[0].diagnostics == ("Adaptador: external_key_cache.",)
+    manifest = report.manifest_path.read_text(encoding="utf-8")
+    assert "external_key_cache" in manifest
+    assert "PRIVATE-TEST-KEY" not in manifest

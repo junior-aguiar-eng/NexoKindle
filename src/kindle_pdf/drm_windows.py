@@ -11,7 +11,7 @@ import sys
 from typing import Callable, ContextManager
 
 from .detect import detect_book
-from .drm import DecryptResult, SecretInput
+from .drm import DecryptResult, DecryptStatus, SecretInput
 
 ARCHIVER_25218_SHA256 = "a06d8946901cf962a8024e8a4c34cb9ebcd7d61b5ebd443e41d7738474096157"
 MAX_BOOK_COPY_BYTES = 2 * 1024**3
@@ -97,19 +97,21 @@ class WindowsKindleAdapter:
             return None
         return matches[0] / "LocalCache" / "Local" / "Microsoft" / "Crypto" / "PCPKSP"
 
-    def _preflight(self, source: Path) -> bool:
+    def _preflight(self, source: Path) -> DecryptStatus | None:
         if sys.platform != "win32" or not source.parent.name.endswith("_EBOK"):
-            return False
+            return "unsupported"
         if not all(path.is_file() for path in (self.archiver_exe, self.calibre_customize_exe,
                                                self.calibre_debug_exe, self.kfx_input_zip)):
-            return False
+            return "unsupported"
         if self.archiver_sha256 is not None and _sha256(self.archiver_exe) != self.archiver_sha256.lower():
-            return False
+            return "unsupported"
         key_cache = self._external_key_cache(source)
-        if key_cache is None or key_cache.exists():
+        if key_cache is None:
+            return "unsupported"
+        if key_cache.exists():
             # Essa versão copia essa pasta para fora da área temporária se ela existir.
-            return False
-        return True
+            return "external_key_cache"
+        return None
 
     @staticmethod
     def _copy_book(source: Path, books_root: Path) -> None:
@@ -126,8 +128,9 @@ class WindowsKindleAdapter:
 
     def decrypt(self, input_path: Path, output_dir: Path, credential: SecretInput) -> DecryptResult:
         source = Path(input_path).resolve()
-        if not self._preflight(source):
-            return DecryptResult("unsupported")
+        preflight_failure = self._preflight(source)
+        if preflight_failure is not None:
+            return DecryptResult(preflight_failure)
         destination = Path(output_dir).resolve()
         try:
             destination.mkdir(parents=True, exist_ok=True)
