@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12; `pytest`; KindleUnpack para arquivos Kindle sem DRM compatíveis; `html5lib` para HTML legado; WeasyPrint para PDF; PyMuPDF para validação; PySide6 para interface; PyInstaller para investigar distribuição portátil. Versões finais devem ser fixadas após a prova de empacotamento e compatibilidade das amostras. Nenhuma dessas bibliotecas substitui o diagnóstico do arquivo real.
 
-**Spec:** [`PROMPT_KINDLE.txt`](../../../PROMPT_KINDLE.txt), complementado pelas decisões do usuário nesta conversa: livros jurídicos comuns, texto corrido, aplicativo agnóstico e portátil. Este plano é a especificação executável consolidada dessas decisões.
+**Spec:** [`PROMPT_KINDLE.txt`](../../PROMPT_KINDLE.txt), complementado pelas decisões do usuário nesta conversa: livros jurídicos comuns, texto corrido, aplicativo agnóstico e portátil. Este plano é a especificação executável consolidada dessas decisões.
 
 ## Global Constraints
 

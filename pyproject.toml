@@ -27,6 +27,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+markers = ["renderer: exige WEASYPRINT_EXE apontando para o WeasyPrint v70 local"]
 
 [tool.ruff]
 exclude = ["src/kindle_pdf/_vendor", ".venv", ".tmp", "build", "dist"]

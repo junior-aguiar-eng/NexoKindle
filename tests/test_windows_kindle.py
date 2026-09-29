@@ -2,7 +2,10 @@
 
 from contextlib import contextmanager
 from pathlib import Path
+import sys
 from zipfile import ZipFile
+
+import pytest
 
 from kindle_pdf.batch import convert_batch
 from kindle_pdf.drm import SecretInput
@@ -25,6 +28,8 @@ def _local_drive(volume: Path):
     yield volume
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Adaptador disponível somente no Windows")
+@pytest.mark.renderer
 def test_windows_chain_converts_one_book_and_cleans_sensitive_workspace(tmp_path: Path) -> None:
     source = _protected_book(tmp_path)
     archiver = tmp_path / "archiver.exe"

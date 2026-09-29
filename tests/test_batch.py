@@ -1,12 +1,15 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from kindle_pdf.batch import convert_batch
 from kindle_pdf.pipeline import ConvertOptions
 from kindle_pdf.render import PrintStyle
 from tests.book_fixtures import CHAPTER, make_text_epub
 
 
+@pytest.mark.renderer
 def test_batch_continues_past_invalid_file_and_records_results(tmp_path: Path) -> None:
     first = make_text_epub(tmp_path / "a.epub")
     invalid = tmp_path / "b.epub"
@@ -27,6 +30,7 @@ def test_batch_continues_past_invalid_file_and_records_results(tmp_path: Path) -
     assert all("input_sha256" in item and "options" in item and "pipeline_version" in item for item in manifest["records"].values())
 
 
+@pytest.mark.renderer
 def test_batch_resumes_only_identical_input_and_options(tmp_path: Path) -> None:
     source = make_text_epub(tmp_path / "livro.epub")
     output = tmp_path / "pdfs"
@@ -50,6 +54,7 @@ def test_batch_resumes_only_identical_input_and_options(tmp_path: Path) -> None:
     assert changed_input.results[0].pdf_path != pdf
 
 
+@pytest.mark.renderer
 def test_batch_does_not_resume_modified_pdf(tmp_path: Path) -> None:
     source = make_text_epub(tmp_path / "livro.epub")
     output = tmp_path / "pdfs"
@@ -64,6 +69,7 @@ def test_batch_does_not_resume_modified_pdf(tmp_path: Path) -> None:
     assert pdf.read_bytes() == b"modified"
 
 
+@pytest.mark.renderer
 def test_batch_resumes_original_after_options_change(tmp_path: Path) -> None:
     source = make_text_epub(tmp_path / "livro.epub")
     output = tmp_path / "pdfs"
