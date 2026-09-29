@@ -8,7 +8,7 @@ import sys
 import threading
 from typing import Callable, Iterable
 
-from PySide6.QtCore import QThread, QUrl, Signal
+from PySide6.QtCore import QThread, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QFileDialog, QHBoxLayout, QHeaderView,
@@ -501,8 +501,18 @@ class KindlePdfWindow(QMainWindow):
         super().closeEvent(event)
 
 
+def apply_light_theme(app: QApplication) -> None:
+    """Fixa o tema claro: a folha de estilo pinta fundos claros e não cobre o modo escuro."""
+    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+    app.setStyle("Fusion")
+    app.setPalette(app.style().standardPalette())
+
+
 def launch_gui() -> int:
-    app = QApplication.instance() or QApplication(sys.argv)
+    app = QApplication.instance()
+    if not isinstance(app, QApplication):
+        app = QApplication(sys.argv)
+    apply_light_theme(app)
     window = KindlePdfWindow()
     window.show()
     return app.exec()
