@@ -30,8 +30,19 @@ def _local_drive(volume: Path):
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Adaptador disponível somente no Windows")
 @pytest.mark.renderer
-def test_windows_chain_converts_one_book_and_cleans_sensitive_workspace(tmp_path: Path) -> None:
+@pytest.mark.parametrize("with_key_cache", [False, True])
+def test_windows_chain_converts_one_book_and_cleans_sensitive_workspace(
+    tmp_path: Path, with_key_cache: bool,
+) -> None:
     source = _protected_book(tmp_path)
+    key_cache = tmp_path / "source-keys"
+    profile = tmp_path / "profile-keys"
+    if with_key_cache:
+        key_cache.mkdir()
+        (key_cache / "book.key").write_bytes(b"synthetic key")
+        (key_cache / "empty-folder").mkdir()
+        profile.mkdir()
+        (profile / "unrelated.key").write_bytes(b"existing")
     archiver = tmp_path / "archiver.exe"
     customize = tmp_path / "calibre-customize.exe"
     debug = tmp_path / "calibre-debug.exe"
@@ -45,6 +56,9 @@ def test_windows_chain_converts_one_book_and_cleans_sensitive_workspace(tmp_path
         assert Path(env["TEMP"]).is_relative_to(tmp_path)
         if Path(command[0]) == archiver:
             assert (Path(command[1]) / "TESTBOOK_EBOK" / "TESTBOOK.voucher").is_file()
+            if with_key_cache:
+                (profile / "book.key").write_bytes((key_cache / "book.key").read_bytes())
+                (profile / "empty-folder").mkdir()
             archive = Path(command[2]) / "TESTBOOK.kfx-zip"
             with ZipFile(archive, "w") as zipfile:
                 zipfile.writestr("book.azw", b"CONT" + b"test")
@@ -58,7 +72,8 @@ def test_windows_chain_converts_one_book_and_cleans_sensitive_workspace(tmp_path
     adapter = WindowsKindleAdapter(
         archiver_exe=archiver, calibre_customize_exe=customize,
         calibre_debug_exe=debug, kfx_input_zip=plugin,
-        key_cache_path=tmp_path / "absent-key-cache",
+        key_cache_path=key_cache, profile_key_cache_path=profile,
+        allow_profile_key_copy=True,
         drive_mapper=_local_drive, run_command=run_command,
         archiver_sha256=None,
     )
@@ -76,6 +91,10 @@ def test_windows_chain_converts_one_book_and_cleans_sensitive_workspace(tmp_path
     assert not list(output.rglob("*.keyfile"))
     assert not list(output.rglob("*.epub"))
     assert not list(output.rglob("*.kfx-zip"))
+    if with_key_cache:
+        assert (profile / "unrelated.key").read_bytes() == b"existing"
+        assert not (profile / "book.key").exists()
+        assert not (profile / "empty-folder").exists()
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Adaptador disponível somente no Windows")
@@ -98,6 +117,131 @@ def test_windows_chain_rejects_external_key_cache_without_running_tool(tmp_path:
     result = adapter.decrypt(source, tmp_path / "scratch", SecretInput("LOCAL-SESSION-ONLY"))
     assert result.status == "external_key_cache"
     assert calls == []
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Adaptador disponível somente no Windows")
+@pytest.mark.parametrize("archiver_exit", [0, 1])
+def test_profile_key_copy_is_removed_after_archiver(tmp_path: Path, archiver_exit: int) -> None:
+    source = _protected_book(tmp_path)
+    key_cache = tmp_path / "source-keys"
+    key_cache.mkdir()
+    (key_cache / "book.key").write_bytes(b"synthetic key")
+    profile = tmp_path / "profile-keys"
+    profile.mkdir()
+    (profile / "unrelated.key").write_bytes(b"existing")
+    tools = [tmp_path / name for name in ("archiver.exe", "calibre-customize.exe", "calibre-debug.exe", "KFX Input.zip")]
+    for tool in tools:
+        tool.write_bytes(b"test tool")
+    calls = []
+
+    def run_command(command, *, cwd, env, timeout):
+        calls.append(Path(command[0]).name)
+        if Path(command[0]) == tools[0]:
+            (profile / "book.key").write_bytes((key_cache / "book.key").read_bytes())
+            return archiver_exit
+        return 1
+
+    adapter = WindowsKindleAdapter(
+        archiver_exe=tools[0], calibre_customize_exe=tools[1], calibre_debug_exe=tools[2],
+        kfx_input_zip=tools[3], key_cache_path=key_cache, profile_key_cache_path=profile,
+        allow_profile_key_copy=True, drive_mapper=_local_drive, run_command=run_command,
+        archiver_sha256=None,
+    )
+    result = adapter.decrypt(source, tmp_path / "scratch", SecretInput("LOCAL-SESSION-ONLY"))
+    assert result.status == ("unsupported" if archiver_exit == 0 else "failed")
+    assert calls == ["archiver.exe"]
+    assert (profile / "unrelated.key").read_bytes() == b"existing"
+    assert not (profile / "book.key").exists()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Adaptador disponível somente no Windows")
+def test_profile_key_collision_blocks_archiver(tmp_path: Path) -> None:
+    source = _protected_book(tmp_path)
+    key_cache = tmp_path / "source-keys"
+    key_cache.mkdir()
+    (key_cache / "book.key").write_bytes(b"new")
+    profile = tmp_path / "profile-keys"
+    profile.mkdir()
+    (profile / "book.key").write_bytes(b"existing")
+    tools = [tmp_path / name for name in ("archiver.exe", "calibre-customize.exe", "calibre-debug.exe", "KFX Input.zip")]
+    for tool in tools:
+        tool.write_bytes(b"test tool")
+    calls = []
+    adapter = WindowsKindleAdapter(
+        archiver_exe=tools[0], calibre_customize_exe=tools[1], calibre_debug_exe=tools[2],
+        kfx_input_zip=tools[3], key_cache_path=key_cache, profile_key_cache_path=profile,
+        allow_profile_key_copy=True, drive_mapper=_local_drive,
+        run_command=lambda *a, **kw: calls.append(a) or 0, archiver_sha256=None,
+    )
+    result = adapter.decrypt(source, tmp_path / "scratch", SecretInput("LOCAL-SESSION-ONLY"))
+    assert result.status == "external_key_cache"
+    assert calls == []
+    assert (profile / "book.key").read_bytes() == b"existing"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Adaptador disponível somente no Windows")
+def test_profile_key_copy_changed_by_other_process_is_not_deleted(tmp_path: Path) -> None:
+    source = _protected_book(tmp_path)
+    key_cache = tmp_path / "source-keys"
+    key_cache.mkdir()
+    (key_cache / "book.key").write_bytes(b"new")
+    profile = tmp_path / "profile-keys"
+    profile.mkdir()
+    tools = [tmp_path / name for name in ("archiver.exe", "calibre-customize.exe", "calibre-debug.exe", "KFX Input.zip")]
+    for tool in tools:
+        tool.write_bytes(b"test tool")
+
+    def run_command(command, *, cwd, env, timeout):
+        (profile / "book.key").write_bytes(b"changed after copying")
+        return 1
+
+    adapter = WindowsKindleAdapter(
+        archiver_exe=tools[0], calibre_customize_exe=tools[1], calibre_debug_exe=tools[2],
+        kfx_input_zip=tools[3], key_cache_path=key_cache, profile_key_cache_path=profile,
+        allow_profile_key_copy=True, drive_mapper=_local_drive, run_command=run_command,
+        archiver_sha256=None,
+    )
+    result = adapter.decrypt(source, tmp_path / "scratch", SecretInput("LOCAL-SESSION-ONLY"))
+    assert result.status == "external_key_cache"
+    assert (profile / "book.key").read_bytes() == b"changed after copying"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Adaptador disponível somente no Windows")
+@pytest.mark.parametrize("fixed_key_exists", [False, True])
+def test_archiver_fixed_key_path_is_guarded(tmp_path: Path, fixed_key_exists: bool) -> None:
+    source = _protected_book(tmp_path)
+    key_cache = tmp_path / "source-keys"
+    key_cache.mkdir()
+    (key_cache / "book.key").write_bytes(b"synthetic")
+    profile = tmp_path / "profile-keys"
+    fixed = (profile / "d8c37e00045ea5de98d93811f777d227040edd50"
+             / "4111704e63913bc011faadfaf420c7573b17ac83.PCPKEY")
+    fixed.parent.mkdir(parents=True)
+    if fixed_key_exists:
+        fixed.write_bytes(b"previous Windows key")
+    tools = [tmp_path / name for name in ("archiver.exe", "calibre-customize.exe", "calibre-debug.exe", "KFX Input.zip")]
+    for tool in tools:
+        tool.write_bytes(b"test tool")
+    calls = []
+
+    def run_command(command, *, cwd, env, timeout):
+        calls.append(Path(command[0]).name)
+        fixed.write_bytes(b"")
+        return 1
+
+    adapter = WindowsKindleAdapter(
+        archiver_exe=tools[0], calibre_customize_exe=tools[1], calibre_debug_exe=tools[2],
+        kfx_input_zip=tools[3], key_cache_path=key_cache, profile_key_cache_path=profile,
+        allow_profile_key_copy=True, drive_mapper=_local_drive, run_command=run_command,
+        archiver_sha256=None,
+    )
+    result = adapter.decrypt(source, tmp_path / "scratch", SecretInput("LOCAL-SESSION-ONLY"))
+    assert result.status == ("external_key_cache" if fixed_key_exists else "failed")
+    assert calls == ([] if fixed_key_exists else ["archiver.exe"])
+    if fixed_key_exists:
+        assert fixed.read_bytes() == b"previous Windows key"
+    else:
+        assert not fixed.exists()
 
 
 def test_key_cache_is_bound_to_selected_kindle_package(tmp_path: Path, monkeypatch) -> None:

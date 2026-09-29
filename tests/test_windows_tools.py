@@ -27,6 +27,7 @@ def test_resolves_complete_tools_relative_to_moved_app(tmp_path: Path) -> None:
     assert adapter is not None
     assert adapter.archiver_exe == (app_dir / "tools" / "MSIXKFXArchiver_x64_1_25218.exe").resolve()
     assert adapter.kfx_input_zip == (app_dir / "tools" / "KFX Input.zip").resolve()
+    assert adapter.allow_profile_key_copy is True
 
 
 def test_missing_or_wrong_archiver_is_not_accepted(tmp_path: Path) -> None:

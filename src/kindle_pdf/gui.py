@@ -421,8 +421,8 @@ class KindlePdfWindow(QMainWindow):
             result = report.results[0]
             if "Adaptador: external_key_cache." in result.diagnostics:
                 self.status_label.setText(
-                    "Conversão indisponível neste PC: o cache de chaves do Kindle existe e a ferramenta atual "
-                    "o copiaria para fora da área temporária. Nenhum PDF foi criado.")
+                    "Conversão interrompida para proteger o cache de chaves deste Windows. "
+                    "Nenhum PDF foi criado.")
                 return
             messages = {
                 "converted": "PDF pronto. Clique em Abrir PDF.",

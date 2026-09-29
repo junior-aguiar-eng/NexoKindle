@@ -43,4 +43,5 @@ def resolve_windows_tools(app_dir: Path, *, expected_hashes: tuple[str, str, str
     archiver, customize, debug, plugin = _paths(app_dir)
     return WindowsKindleAdapter(archiver_exe=archiver, calibre_customize_exe=customize,
                                 calibre_debug_exe=debug, kfx_input_zip=plugin,
-                                archiver_sha256=expected_hashes[0])
+                                archiver_sha256=expected_hashes[0],
+                                allow_profile_key_copy=True)
