@@ -420,3 +420,21 @@ def test_folder_scan_can_be_cancelled_without_adding_partial_selection(qapp, mon
     assert window.table.rowCount() == 0
     assert window.start_button.isEnabled()
     window.close()
+
+
+def test_light_theme_keeps_text_dark_over_light_background(qapp) -> None:
+    from PySide6.QtGui import QColor, QPalette
+
+    dark = QPalette()
+    dark.setColor(QPalette.ColorRole.WindowText, QColor("white"))
+    dark.setColor(QPalette.ColorRole.ButtonText, QColor("white"))
+    dark.setColor(QPalette.ColorRole.Window, QColor("#202020"))
+    qapp.setPalette(dark)
+    gui_module.apply_light_theme(qapp)
+    window = KindlePdfWindow()
+    palette = window.palette()
+
+    assert palette.color(QPalette.ColorRole.WindowText).lightness() < 100
+    assert palette.color(QPalette.ColorRole.Window).lightness() > 200
+    assert palette.color(QPalette.ColorRole.ButtonText).lightness() < 100
+    window.close()
