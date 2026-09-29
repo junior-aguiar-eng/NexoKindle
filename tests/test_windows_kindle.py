@@ -78,6 +78,7 @@ def test_windows_chain_converts_one_book_and_cleans_sensitive_workspace(tmp_path
     assert not list(output.rglob("*.kfx-zip"))
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Adaptador disponível somente no Windows")
 def test_windows_chain_rejects_external_key_cache_without_running_tool(tmp_path: Path) -> None:
     source = _protected_book(tmp_path)
     key_cache = tmp_path / "outside-key-cache"
