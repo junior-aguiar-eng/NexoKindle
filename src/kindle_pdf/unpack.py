@@ -15,6 +15,10 @@ from .model import UnpackedBook
 MAX_EXTRACTED_BYTES = 1024**3
 MAX_ENTRIES = 10000
 MAX_CONTAINER_BYTES = 1024 * 1024
+if sys.platform == "win32":
+    _NO_WINDOW = subprocess.CREATE_NO_WINDOW
+else:
+    _NO_WINDOW = 0
 
 
 class UnsafeArchiveError(ValueError):
@@ -115,7 +119,7 @@ def _unpack_kindle(source: Path, destination: Path) -> Path:
             errors="replace",
             timeout=180,
             check=False,
-            creationflags=subprocess.CREATE_NO_WINDOW if frozen and sys.platform == "win32" else 0,
+            creationflags=_NO_WINDOW if frozen and sys.platform == "win32" else 0,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise ExtractionError("Falha ao executar KindleUnpack local.") from exc

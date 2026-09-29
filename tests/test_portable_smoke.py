@@ -1,8 +1,10 @@
 from pathlib import Path
 
 import pymupdf
+import pytest
 
 
+@pytest.mark.renderer
 def test_smoke_pdf_contains_text(tmp_path: Path) -> None:
     from scripts.portable_smoke import make_smoke_pdf
 

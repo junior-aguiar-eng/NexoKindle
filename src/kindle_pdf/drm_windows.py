@@ -17,6 +17,10 @@ ARCHIVER_25218_SHA256 = "a06d8946901cf962a8024e8a4c34cb9ebcd7d61b5ebd443e41d7738
 MAX_BOOK_COPY_BYTES = 2 * 1024**3
 DriveMapper = Callable[[Path], ContextManager[Path]]
 CommandRunner = Callable[..., int]
+if sys.platform == "win32":
+    _NO_WINDOW = subprocess.CREATE_NO_WINDOW
+else:
+    _NO_WINDOW = 0
 
 
 def _sha256(path: Path) -> str:
@@ -31,7 +35,7 @@ def _run_silent(command: list[str], *, cwd: Path, env: dict[str, str], timeout: 
     completed = subprocess.run(
         command, cwd=cwd, env=env, timeout=timeout, shell=False,
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        creationflags=_NO_WINDOW if sys.platform == "win32" else 0,
         check=False,
     )
     return completed.returncode

@@ -1,12 +1,13 @@
 from pathlib import Path
 
 import pymupdf
+import pytest
 
 from kindle_pdf.pipeline import ConvertOptions, convert_one
-from kindle_pdf.render import PrintStyle
 from tests.book_fixtures import CHAPTER, INTRO, make_epub, make_text_epub
 
 
+@pytest.mark.renderer
 def test_convert_one_keeps_same_title_books_distinct(tmp_path: Path) -> None:
     first = make_text_epub(tmp_path / "first.epub")
     second = make_text_epub(tmp_path / "second.epub", {
@@ -45,6 +46,7 @@ def test_failed_renderer_preserves_existing_pdf_and_cleans_temp(tmp_path: Path) 
     assert not list(output.glob("*.pdf")) == []
 
 
+@pytest.mark.renderer
 def test_review_required_is_stored_outside_published_pdfs(tmp_path: Path) -> None:
     source = make_epub(tmp_path / "livro.epub", {
         "OEBPS/Text/z-intro.xhtml": INTRO.replace(b"../Images/figura.svg", b"../Images/ausente.svg"),

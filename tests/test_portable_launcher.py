@@ -1,6 +1,7 @@
 """The frozen application must still run KindleUnpack in a child process."""
 
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -9,6 +10,7 @@ from kindle_pdf import unpack
 from scripts import portable_app
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Worker .exe existe somente no Windows")
 def test_frozen_kindleunpack_uses_internal_worker(tmp_path: Path, monkeypatch) -> None:
     source = tmp_path / "sample.azw3"
     source.write_bytes(b"test")
@@ -31,6 +33,28 @@ def test_frozen_kindleunpack_uses_internal_worker(tmp_path: Path, monkeypatch) -
     assert calls[0][0] == [worker, "--internal-kindleunpack", str(source), str(destination)]
     assert calls[0][1]["shell"] is False
     assert calls[0][1]["creationflags"] == unpack.subprocess.CREATE_NO_WINDOW
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Cobre o worker fora do Windows")
+def test_frozen_kindleunpack_reuses_executable_outside_windows(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "sample.azw3"
+    source.write_bytes(b"test")
+    destination = tmp_path / "output"
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        (destination / "mobi8").mkdir(parents=True)
+        (destination / "mobi8" / "content.opf").write_text("<package/>")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(unpack.sys, "frozen", True, raising=False)
+    monkeypatch.delenv("KINDLEUNPACK_SCRIPT", raising=False)
+    monkeypatch.setattr(unpack.subprocess, "run", fake_run)
+    unpack._unpack_kindle(source, destination)
+
+    assert calls[0][0] == [unpack.sys.executable, "--internal-kindleunpack", str(source), str(destination)]
+    assert calls[0][1]["creationflags"] == 0
 
 
 def test_frozen_worker_calls_vendored_main(monkeypatch) -> None:

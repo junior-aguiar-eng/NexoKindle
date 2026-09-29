@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Bibliotecas do Qt e do WeasyPrint
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon0 libpango-1.0-0 libpangoft2-1.0-0
+      - name: Dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[gui]" pytest==9.1.1 ruff==0.13.2 mypy==1.18.2
+          python -m venv "$RUNNER_TEMP/weasyprint"
+          "$RUNNER_TEMP/weasyprint/bin/pip" install weasyprint==70.0
+          echo "WEASYPRINT_EXE=$RUNNER_TEMP/weasyprint/bin/weasyprint" >> "$GITHUB_ENV"
+      - run: ruff check .
+      - run: mypy src
+      - run: pytest -q

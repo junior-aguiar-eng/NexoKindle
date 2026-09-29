@@ -10,6 +10,7 @@ from kindle_pdf.render import PrintStyle, RenderError, UnsafeRenderInputError, r
 from tests.print_fixtures import make_print_book
 
 
+@pytest.mark.renderer
 def test_render_pdf_has_text_chapters_note_table_and_image(tmp_path: Path) -> None:
     book = make_print_book(tmp_path / "book")
     output = tmp_path / "book.tmp.pdf"
@@ -44,6 +45,7 @@ def test_render_rejects_remote_image_even_for_direct_book_model(tmp_path: Path) 
     assert not (tmp_path / "out.pdf").exists()
 
 
+@pytest.mark.renderer
 def test_render_rebases_inline_svg_image_to_local_resource(tmp_path: Path) -> None:
     from tests.print_fixtures import PNG
 
@@ -64,6 +66,7 @@ def test_render_rebases_inline_svg_image_to_local_resource(tmp_path: Path) -> No
         assert "Cover" not in " ".join(page.get_text() for page in pdf)
 
 
+@pytest.mark.renderer
 def test_render_removes_partial_pdf_after_renderer_timeout(tmp_path: Path, monkeypatch) -> None:
     book = make_print_book(tmp_path / "book")
     target = tmp_path / "partial.tmp.pdf"
@@ -80,6 +83,7 @@ def test_render_removes_partial_pdf_after_renderer_timeout(tmp_path: Path, monke
     assert not target.exists()
 
 
+@pytest.mark.renderer
 def test_render_rejects_css_import_hidden_by_comment(tmp_path: Path) -> None:
     source = tmp_path / "chapter.xhtml"
     source.write_text("", encoding="utf-8")
@@ -111,6 +115,7 @@ def test_render_rebases_external_svg_use_reference(tmp_path: Path) -> None:
     assert sprite.as_uri() + "#shape" in body
 
 
+@pytest.mark.renderer
 def test_render_rejects_attachment_link_to_local_file(tmp_path: Path) -> None:
     source = tmp_path / "chapter.xhtml"
     source.write_text("", encoding="utf-8")
@@ -124,6 +129,7 @@ def test_render_rejects_attachment_link_to_local_file(tmp_path: Path) -> None:
         render_pdf(book, tmp_path / "out.tmp.pdf", PrintStyle(renderer=Path(os.environ["WEASYPRINT_EXE"])))
 
 
+@pytest.mark.renderer
 def test_render_rejects_local_file_reference_inside_svg_resource(tmp_path: Path) -> None:
     source = tmp_path / "chapter.xhtml"
     source.write_text("", encoding="utf-8")

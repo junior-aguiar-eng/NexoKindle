@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from kindle_pdf.cli import main
 from tests.book_fixtures import CHAPTER, make_text_epub
 
@@ -34,6 +36,7 @@ def test_cli_exit_codes_separate_unsupported_and_invalid(
     assert json.loads(capsys.readouterr().out)["status"] == "invalid_file"
 
 
+@pytest.mark.renderer
 def test_cli_converter_emits_optional_json_summary(tmp_path: Path, capsys) -> None:
     source = make_text_epub(tmp_path / "livro.epub")
     output = tmp_path / "pdfs"
@@ -48,6 +51,7 @@ def test_cli_converter_emits_optional_json_summary(tmp_path: Path, capsys) -> No
     assert printed.err == ""
 
 
+@pytest.mark.renderer
 def test_cli_converter_pasta_reports_each_item_and_resume(tmp_path: Path, capsys) -> None:
     source_dir = tmp_path / "books"
     source_dir.mkdir()

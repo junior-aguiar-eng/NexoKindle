@@ -67,6 +67,7 @@ def test_protected_input_needs_adapter_and_cannot_publish_by_default(tmp_path: P
     assert not output.exists()
 
 
+@pytest.mark.renderer
 def test_injected_adapter_may_supply_supported_intermediate_without_leaking_secret(tmp_path: Path) -> None:
     source = protected_sample(tmp_path / "book.azw")
     secret = SecretInput("CHAVE-SINTETICA-NAO-REAL")
@@ -104,6 +105,7 @@ def test_adapter_cannot_return_file_outside_temporary_directory(tmp_path: Path) 
     assert not list((tmp_path / "pdfs").glob("*.pdf"))
 
 
+@pytest.mark.renderer
 def test_protected_batch_resumes_validated_pdf_without_storing_credential(tmp_path: Path) -> None:
     source = protected_sample(tmp_path / "book.azw")
     calls = 0

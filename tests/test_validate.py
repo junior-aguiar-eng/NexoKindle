@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import pymupdf
+import pytest
 
 from kindle_pdf.model import BookModel, Chapter
 from kindle_pdf.render import PrintStyle, render_pdf
@@ -9,6 +10,7 @@ from kindle_pdf.validate import validate_pdf
 from tests.print_fixtures import make_print_book
 
 
+@pytest.mark.renderer
 def test_validate_pdf_accepts_complete_textual_book(tmp_path: Path) -> None:
     book = make_print_book(tmp_path / "book")
     pdf = render_pdf(book, tmp_path / "book.tmp.pdf", PrintStyle(renderer=Path(os.environ["WEASYPRINT_EXE"])))
@@ -35,6 +37,7 @@ def test_validate_pdf_rejects_unreadable_or_textless_output(tmp_path: Path) -> N
     assert validate_pdf(empty, book).status == "invalid"
 
 
+@pytest.mark.renderer
 def test_validate_pdf_marks_missing_note_or_image_for_review(tmp_path: Path) -> None:
     book = make_print_book(tmp_path / "book")
     pdf = render_pdf(book, tmp_path / "book.tmp.pdf", PrintStyle(renderer=Path(os.environ["WEASYPRINT_EXE"])))
@@ -51,6 +54,7 @@ def test_validate_pdf_marks_missing_note_or_image_for_review(tmp_path: Path) -> 
     assert validate_pdf(pdf, expected_with_warning).status == "review_required"
 
 
+@pytest.mark.renderer
 def test_validate_accepts_image_only_cover_without_visible_cover_label(tmp_path: Path) -> None:
     from tests.print_fixtures import PNG
 
@@ -74,6 +78,7 @@ def test_validate_accepts_image_only_cover_without_visible_cover_label(tmp_path:
     assert report.chapters_found == 2
 
 
+@pytest.mark.renderer
 def test_validate_rejects_missing_second_chapter_with_repeated_title(tmp_path: Path) -> None:
     source = tmp_path / "chapter.xhtml"
     source.write_text("", encoding="utf-8")
@@ -89,6 +94,7 @@ def test_validate_rejects_missing_second_chapter_with_repeated_title(tmp_path: P
     assert report.chapters_found == 1
 
 
+@pytest.mark.renderer
 def test_validate_marks_second_missing_image_and_div_footnote_for_review(tmp_path: Path) -> None:
     book = make_print_book(tmp_path / "book")
     pdf = render_pdf(book, tmp_path / "book.tmp.pdf", PrintStyle(renderer=Path(os.environ["WEASYPRINT_EXE"])))
