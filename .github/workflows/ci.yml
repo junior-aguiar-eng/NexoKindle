@@ -24,5 +24,6 @@ jobs:
           "$RUNNER_TEMP/weasyprint/bin/pip" install weasyprint==70.0
           echo "WEASYPRINT_EXE=$RUNNER_TEMP/weasyprint/bin/weasyprint" >> "$GITHUB_ENV"
       - run: ruff check .
-      - run: mypy src
+      - name: Tipos do aplicativo Windows
+        run: mypy --platform win32 src
       - run: pytest -q
