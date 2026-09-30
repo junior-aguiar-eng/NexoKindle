@@ -206,6 +206,7 @@ class KindlePdfWindow(QMainWindow):
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._update_open_button)
+        layout.addWidget(self.table)
         self.table.hide()
 
         self.output_edit = QLineEdit(str(default_output_dir()))
@@ -257,6 +258,8 @@ class KindlePdfWindow(QMainWindow):
             self.scan_worker.finished.connect(self._on_scan_thread_finished)
             self.add_files_button.setEnabled(False)
             self.add_folder_button.setEnabled(False)
+            self.kindle_button.setEnabled(False)
+            self.settings_button.setEnabled(False)
             self.start_button.setEnabled(False)
             self.clear_button.setText("Cancelar seleção")
             self.status_label.setText("Lendo a pasta selecionada...")
@@ -269,6 +272,7 @@ class KindlePdfWindow(QMainWindow):
         self._rows = {path: index for index, path in enumerate(self._sources)}
         self._pdfs.clear()
         self.table.setRowCount(len(self._sources))
+        self.table.setVisible(len(self._sources) > 1)
         for row, path in enumerate(self._sources):
             for column, value in enumerate((str(path), "—", "Aguardando", "")):
                 self.table.setItem(row, column, QTableWidgetItem(value))
@@ -295,17 +299,23 @@ class KindlePdfWindow(QMainWindow):
         self._rows.clear()
         self._pdfs.clear()
         self.table.setRowCount(0)
+        self.table.hide()
+        self._update_open_button()
         self.selected_label.setText("Nenhum livro selecionado")
         self.status_label.setText("Selecione ao menos um livro.")
 
     def _choose_files(self) -> None:
+        if self._working or self._scanning:
+            return
         files, _ = QFileDialog.getOpenFileNames(
             self, "Selecionar livros", "", "Livros (*.epub *.azw *.azw3 *.mobi *.kfx *.kfx-zip *.zip);;Todos (*.*)")
         if files:
             self.clear_sources()
-            self.add_paths([Path(files[0])])
+            self.add_paths([Path(file) for file in files])
 
     def _choose_kindle_book(self) -> None:
+        if self._working or self._scanning:
+            return
         local = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
         books = discover_kindle_books(local)
         if not books:
@@ -329,6 +339,8 @@ class KindlePdfWindow(QMainWindow):
             self.add_paths([Path(folder)])
 
     def _choose_output(self) -> None:
+        if self._working or self._scanning:
+            return
         folder = QFileDialog.getExistingDirectory(self, "Selecionar destino dos PDFs")
         if folder:
             self.output_edit.setText(folder)
@@ -373,7 +385,14 @@ class KindlePdfWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.status_label.setText("Diagnosticando os livros selecionados...")
         self._working = True
-        for button in (self.add_files_button, self.add_folder_button, self.clear_button):
+        self._pdfs.clear()
+        self._update_open_button()
+        for row in range(self.table.rowCount()):
+            self._cell(row, 2).setText("Aguardando")
+            self._cell(row, 2).setToolTip("")
+            self._cell(row, 3).setText("")
+        for button in (self.add_files_button, self.add_folder_button, self.clear_button,
+                       self.kindle_button, self.settings_button):
             button.setEnabled(False)
         self.start_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
@@ -402,12 +421,16 @@ class KindlePdfWindow(QMainWindow):
     def _on_progress(self, index: int, total: int, result: ConversionResult) -> None:
         row = self._rows.get(result.input_path)
         if row is not None:
+            self._pdfs.pop(result.input_path, None)
+            self._cell(row, 3).setText("")
             self._cell(row, 2).setText(result.status)
             self._cell(row, 2).setToolTip("; ".join(result.diagnostics))
             pdf = result.pdf_path if result.status == "converted" else None
             if pdf is not None:
                 self._pdfs[result.input_path] = pdf
                 self._cell(row, 3).setText(str(pdf))
+            elif result.review_path is not None:
+                self._cell(row, 3).setText(str(result.review_path))
         self.progress_bar.setValue(index)
         self.status_label.setText(f"Processados {index} de {total} livro(s).")
         self._update_open_button()
@@ -431,7 +454,10 @@ class KindlePdfWindow(QMainWindow):
                 "protected_or_unreadable": "Não foi possível converter este livro nesta instalação.",
                 "failed": "Falha ao converter este livro. Confira se está baixado por completo.",
             }
-            self.status_label.setText(messages[result.status])
+            details = "; ".join(dict.fromkeys(result.diagnostics))
+            artifact = result.pdf_path or result.review_path
+            self.status_label.setText("\n".join(part for part in (
+                messages[result.status], details, f"Arquivo: {artifact}" if artifact else "") if part))
         else:
             converted = sum(result.status == "converted" for result in report.results)
             self.status_label.setText(f"{converted} PDF(s) pronto(s) de {len(report.results)} livro(s).")
@@ -443,7 +469,8 @@ class KindlePdfWindow(QMainWindow):
 
     def _on_thread_finished(self) -> None:
         self._working = False
-        for button in (self.add_files_button, self.add_folder_button, self.clear_button):
+        for button in (self.add_files_button, self.add_folder_button, self.clear_button,
+                       self.kindle_button, self.settings_button):
             button.setEnabled(True)
         if self._close_pending:
             self.close()
@@ -455,6 +482,8 @@ class KindlePdfWindow(QMainWindow):
         self._scanning = False
         self.add_files_button.setEnabled(True)
         self.add_folder_button.setEnabled(True)
+        self.kindle_button.setEnabled(True)
+        self.settings_button.setEnabled(True)
         self.start_button.setEnabled(True)
         self.clear_button.setText("Limpar seleção")
         if self._close_pending:

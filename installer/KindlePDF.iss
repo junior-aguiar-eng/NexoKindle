@@ -2,7 +2,7 @@
 [Setup]
 AppId=KindlePDF.BoniJr
 AppName=KindlePDF
-AppVersion=0.6.4
+AppVersion=0.6.8
 AppPublisher=Boni Jr
 DefaultDirName={localappdata}\Programs\KindlePDF
 DefaultGroupName=KindlePDF

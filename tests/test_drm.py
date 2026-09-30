@@ -16,6 +16,43 @@ def protected_sample(path: Path) -> Path:
     return path
 
 
+@pytest.mark.renderer
+def test_changed_protected_sidecar_forces_new_conversion(tmp_path):
+    folder = tmp_path / "BOOK_EBOK"
+    folder.mkdir()
+    source = protected_sample(folder / "BOOK.azw")
+    voucher = folder / "BOOK.voucher"
+    voucher.write_bytes(b"first voucher")
+    calls = []
+    class Adapter:
+        def decrypt(self, input_path, output_dir, credential):
+            calls.append(1)
+            return DecryptResult("decrypted", make_text_epub(output_dir / "book.epub"))
+    options = ConvertOptions(decrypt_adapter=Adapter(), credential=SecretInput("fake"))
+    first = convert_batch([source], tmp_path / "pdfs", options)
+    assert first.results[0].status == "converted"
+    voucher.write_bytes(b"changed voucher")
+    second = convert_batch([source], tmp_path / "pdfs", options)
+    assert second.resumed_count == 0
+    assert second.results[0].status == "converted"
+    assert second.results[0].pdf_path != first.results[0].pdf_path
+    assert len(calls) == 2
+
+
+@pytest.mark.renderer
+def test_bad_protected_folder_does_not_abort_other_books(tmp_path):
+    folder = tmp_path / "BOOK_EBOK"
+    folder.mkdir()
+    source = protected_sample(folder / "BOOK.azw")
+    (folder / "unexpected-folder").mkdir()
+    class Adapter:
+        def decrypt(self, input_path, output_dir, credential):
+            raise AssertionError("Invalid folder must fail before adapter execution")
+    readable = make_text_epub(tmp_path / "readable.epub")
+    report = convert_batch([source, readable], tmp_path / "pdfs", ConvertOptions(decrypt_adapter=Adapter(), credential=SecretInput("fake")))
+    assert [r.status for r in report.results] == ["failed", "converted"]
+
+
 def test_secret_is_absent_from_result_log_and_serialization(tmp_path: Path, caplog) -> None:
     source = protected_sample(tmp_path / "book.azw")
     secret = SecretInput("SERIAL-DE-TESTE-NAO-REAL")

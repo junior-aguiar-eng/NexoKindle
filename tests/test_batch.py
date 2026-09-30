@@ -10,6 +10,26 @@ from tests.book_fixtures import CHAPTER, make_text_epub
 
 
 @pytest.mark.renderer
+def test_pipeline_upgrade_reconverts_without_overwriting_previous_pdf(tmp_path, monkeypatch):
+    import kindle_pdf.pipeline as pipeline
+    import kindle_pdf.batch as batch
+    source = make_text_epub(tmp_path / "book.epub")
+    output = tmp_path / "pdfs"
+    monkeypatch.setattr(pipeline, "PIPELINE_VERSION", "old-validation")
+    monkeypatch.setattr(batch, "PIPELINE_VERSION", "old-validation")
+    first = convert_batch([source], output, ConvertOptions())
+    old_pdf = first.results[0].pdf_path
+    before = old_pdf.read_bytes()
+    monkeypatch.setattr(pipeline, "PIPELINE_VERSION", "new-validation")
+    monkeypatch.setattr(batch, "PIPELINE_VERSION", "new-validation")
+    second = convert_batch([source], output, ConvertOptions())
+    assert second.resumed_count == 0
+    assert second.results[0].status == "converted"
+    assert second.results[0].pdf_path != old_pdf
+    assert old_pdf.read_bytes() == before
+
+
+@pytest.mark.renderer
 def test_batch_continues_past_invalid_file_and_records_results(tmp_path: Path) -> None:
     first = make_text_epub(tmp_path / "a.epub")
     invalid = tmp_path / "b.epub"

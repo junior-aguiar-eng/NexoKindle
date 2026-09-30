@@ -11,13 +11,14 @@ from typing import Callable, Literal
 
 from .detect import detect_book
 from .drm import DecryptAdapter, SecretInput, diagnose_protected
+from .drm_windows import WindowsKindleAdapter
 from .model import BookModel
 from .prepare import InvalidBookError, UnsafeResourceError, prepare_book
 from .render import PrintStyle, RenderError, UnsafeRenderInputError, render_pdf
 from .unpack import ExtractionError, ToolUnavailableError, UnsafeArchiveError, UnsupportedBookError, unpack_book
 from .validate import validate_pdf
 
-PIPELINE_VERSION = "0.6.0"
+PIPELINE_VERSION = "0.6.8"
 ConversionStatus = Literal["converted", "review_required", "unsupported", "protected_or_unreadable", "failed"]
 RenderCallable = Callable[[BookModel, Path, PrintStyle], Path]
 
@@ -44,6 +45,7 @@ def options_signature(options: ConvertOptions) -> dict:
     style = asdict(options.style)
     style["renderer"] = str(options.style.renderer.resolve()) if options.style.renderer else None
     return {
+        "pipeline_version": PIPELINE_VERSION,
         "style": style,
         "renderer_callable": f"{options.renderer.__module__}.{options.renderer.__qualname__}",
         "renderer_executable": str(os.environ.get("WEASYPRINT_EXE", "")) if options.renderer is render_pdf else None,
@@ -52,7 +54,25 @@ def options_signature(options: ConvertOptions) -> dict:
             f"{type(options.decrypt_adapter).__module__}.{type(options.decrypt_adapter).__qualname__}"
             if options.decrypt_adapter is not None else None
         ),
+        "adapter_tools": options.decrypt_adapter.cache_identity()
+        if isinstance(options.decrypt_adapter, WindowsKindleAdapter) else None,
     }
+
+
+def input_identity(source: Path, sha256: str | None, protected: bool) -> str | None:
+    if not protected or not source.parent.name.endswith("_EBOK"):
+        return sha256
+    entries = sorted(source.parent.iterdir(), key=lambda path: path.name)
+    if any(not path.is_file() or path.is_symlink() for path in entries):
+        raise OSError("Pasta do livro contém entrada incompatível.")
+    if sum(path.stat().st_size for path in entries) > 2 * 1024**3:
+        raise OSError("Livro excede o limite de cópia temporária.")
+    digest = hashlib.sha256()
+    for path in entries:
+        with path.open("rb") as stream:
+            file_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+        digest.update(json.dumps([path.name, file_hash], ensure_ascii=False).encode())
+    return digest.hexdigest()
 
 
 def _safe_title(title: str) -> str:
@@ -87,6 +107,8 @@ def convert_one(input_path: Path, output_dir: Path, options: ConvertOptions) -> 
     if not detected.sha256:
         return ConversionResult(source, None, "failed", None, None, ("Hash do arquivo indisponível.",))
     try:
+        identity = input_identity(source, detected.sha256, protected)
+        assert identity is not None
         destination.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix=".kindle-pdf-", dir=destination) as scratch:
             work = Path(scratch)
@@ -100,7 +122,7 @@ def convert_one(input_path: Path, output_dir: Path, options: ConvertOptions) -> 
                 readable_source = decrypted.output_path
             unpacked = unpack_book(readable_source, work / "unpacked")
             book = prepare_book(unpacked)
-            filename = _name(book.title, detected.sha256, options)
+            filename = _name(book.title, identity, options)
             target = destination / filename
             review_target = destination / "review" / filename
             if target.exists() or review_target.exists():
@@ -114,6 +136,8 @@ def convert_one(input_path: Path, output_dir: Path, options: ConvertOptions) -> 
                 return ConversionResult(source, detected.sha256, "failed", None, None, validation.warnings)
             if detect_book(source).sha256 != detected.sha256:
                 return ConversionResult(source, detected.sha256, "failed", None, None, ("Arquivo de entrada mudou durante a conversão.",))
+            if input_identity(source, detected.sha256, protected) != identity:
+                return ConversionResult(source, detected.sha256, "failed", None, None, ("Arquivos auxiliares do livro mudaram durante a conversão.",))
             if validation.status == "review_required":
                 _publish_no_clobber(produced, review_target, destination)
                 return ConversionResult(source, detected.sha256, "review_required", None, review_target, validation.warnings)

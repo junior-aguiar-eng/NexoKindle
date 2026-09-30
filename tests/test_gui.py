@@ -40,6 +40,56 @@ def _wait_until(predicate, timeout_ms=3000):
     assert predicate()
 
 
+def test_review_invalidates_previous_pdf_and_explains_result(qapp, tmp_path):
+    source = tmp_path / "book.epub"
+    source.write_bytes(b"book")
+    pdf = tmp_path / "old.pdf"
+    pdf.write_bytes(b"pdf")
+    window = KindlePdfWindow()
+    window.add_paths([source])
+    window._on_progress(1, 1, ConversionResult(source.resolve(), "hash", "converted", pdf, None, ()))
+    review = tmp_path / "review" / "new.pdf"
+    result = ConversionResult(source.resolve(), "hash", "review_required", None, review, ("Nota ausente no texto extraído.",))
+    window._on_progress(1, 1, result)
+    window._on_done(BatchReport((result,), 0, tmp_path / "batch.json"))
+    assert not window.open_button.isEnabled()
+    assert "Nota ausente" in window.status_label.text()
+    assert str(review) in window.status_label.text()
+    window.close()
+
+
+def test_busy_window_blocks_picker_and_destination(qapp, tmp_path):
+    source = tmp_path / "book.epub"
+    source.write_bytes(b"book")
+    release = threading.Event()
+    def batch(paths, destination, options, **kwargs):
+        release.wait(2)
+        return BatchReport((), 0, destination / "batch.json", True)
+    window = KindlePdfWindow(batch_fn=batch, detect_fn=_diagnose)
+    window.add_paths([source])
+    window.output_edit.setText(str(tmp_path / "output"))
+    window.start_conversion()
+    try:
+        assert not window.kindle_button.isEnabled()
+        assert not window.settings_button.isEnabled()
+    finally:
+        release.set()
+        _wait_until(lambda: not window._working)
+        window.close()
+
+
+def test_file_picker_keeps_all_selected_files(qapp, monkeypatch, tmp_path):
+    sources = [tmp_path / "a.epub", tmp_path / "b.epub"]
+    for source in sources:
+        source.write_bytes(b"book")
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames", lambda *args: ([str(p) for p in sources], ""))
+    window = KindlePdfWindow()
+    window._choose_files()
+    assert window._sources == [p.resolve() for p in sources]
+    assert not window.table.isHidden()
+    window.close()
+
+
 def test_collect_sources_expands_local_folder_deduplicates_and_skips_output(tmp_path: Path) -> None:
     folder = tmp_path / "books"
     folder.mkdir()
@@ -195,7 +245,7 @@ def test_window_runs_selected_batch_off_ui_thread_and_shows_result(qapp, tmp_pat
     window.add_paths([book])
     window.output_edit.setText(str(output))
     window.start_conversion()
-    _wait_until(lambda: not window.worker.isRunning() and window.table.item(0, 2).text() == "converted")
+    _wait_until(lambda: not window._working and window.table.item(0, 2).text() == "converted")
 
     assert calls == [([book.resolve()], output.resolve(), True)]
     assert window.table.item(0, 1).text() == "epub"

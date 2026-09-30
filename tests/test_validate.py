@@ -10,6 +10,126 @@ from kindle_pdf.validate import validate_pdf
 from tests.print_fixtures import make_print_book
 
 
+@pytest.mark.parametrize('omit_cell', [False, True])
+def test_table_sections_preserve_cell_comparison_and_detect_cell_loss(tmp_path, omit_cell):
+    html = '<html><body><h1>Chapter</h1><table><tbody><tr><td>First term</td><td>First definition</td></tr><tr><td>Second term</td><td>Second definition</td></tr></tbody></table></body></html>'
+    book = BookModel('Book', 'en', (Chapter('a', 'Chapter', html, tmp_path/'chapter.xhtml'),), (), ())
+    pdf = tmp_path/'table.pdf'
+    with pymupdf.open() as doc:
+        page = doc.new_page()
+        text = 'Chapter\nFirst term\nFirst definition\n1.\nSecond term'
+        if not omit_cell:
+            text += '\nSecond definition'
+        page.insert_text((72,72), text)
+        doc.set_toc([[1,'1. Chapter',1]])
+        doc.save(pdf)
+    assert (validate_pdf(pdf, book).status == 'valid') is (not omit_cell)
+
+
+def test_extraction_spacing_inside_words_does_not_imply_content_loss(tmp_path):
+    book = BookModel('Book', 'pt-BR', (Chapter('a','Chapter','<html><body><h1>Chapter</h1><p>coordenar advogado</p></body></html>',tmp_path/'chapter.xhtml'),), (), ())
+    pdf=tmp_path/'spacing.pdf'
+    with pymupdf.open() as doc:
+        page=doc.new_page()
+        page.insert_text((72,72),'Chapter\ncoorde nar advo gado')
+        doc.set_toc([[1,'1. Chapter',1]])
+        doc.save(pdf)
+    assert validate_pdf(pdf,book).status=='valid'
+
+
+def test_repeated_body_paragraph_must_not_be_approved_when_one_copy_is_lost(tmp_path):
+    book=BookModel('Book','en',(Chapter('a','Chapter','<html><body><h1>Chapter</h1><p>Unique body paragraph.</p><p>Unique body paragraph.</p></body></html>',tmp_path/'chapter.xhtml'),), (), ())
+    pdf=tmp_path/'repeated.pdf'
+    with pymupdf.open() as doc:
+        page=doc.new_page()
+        page.insert_text((72,72),'Chapter\nUnique body paragraph.')
+        doc.set_toc([[1,'1. Chapter',1]])
+        doc.save(pdf)
+    assert validate_pdf(pdf,book).status!='valid'
+
+
+def test_generated_list_labels_do_not_interrupt_body_comparison(tmp_path):
+    paragraph='This complete explanatory paragraph contains substantive material that continues after a page break.'
+    book=BookModel('Book','en',(Chapter('a','Chapter',f'<html><body><h1>Chapter</h1><p>{paragraph}</p></body></html>',tmp_path/'chapter.xhtml'),), (), ())
+    pdf=tmp_path/'labels.pdf'
+    with pymupdf.open() as doc:
+        page=doc.new_page()
+        page.insert_text((40,150),'22)')
+        page.insert_text((72,72),'Chapter\nThis complete explanatory paragraph contains substantive\nmaterial that continues after a page break.')
+        doc.set_toc([[1,'1. Chapter',1]])
+        doc.save(pdf)
+    assert validate_pdf(pdf,book).status=='valid'
+
+
+@pytest.mark.renderer
+def test_automatic_hyphenation_does_not_imply_missing_content(tmp_path):
+    source=tmp_path/'chapter.xhtml'
+    source.write_text('')
+    book=BookModel('Book','pt-BR',(Chapter('a','Chapter','<html><body><h1>Chapter</h1><p style="hyphens:auto;width:25mm">necessariamente multiplicidade interessados compromisso</p></body></html>',source),), (), ())
+    pdf=render_pdf(book,tmp_path/'hyphenated.pdf',PrintStyle())
+    assert validate_pdf(pdf,book).status=='valid'
+
+
+def test_page_number_does_not_interrupt_complete_note(tmp_path):
+    source = tmp_path / 'chapter.xhtml'
+    book = BookModel('Book', 'en', (Chapter('a', 'Chapter', '<html><body><h1>Chapter</h1><aside>Alpha beta.</aside></body></html>', source),), (), ())
+    pdf = tmp_path / 'pages.pdf'
+    with pymupdf.open() as doc:
+        first = doc.new_page()
+        first.insert_text((72,72), 'Chapter\nAlpha')
+        first.insert_text((290,815), '1')
+        second = doc.new_page()
+        second.insert_text((72,72), 'beta.')
+        second.insert_text((290,815), '2')
+        doc.set_toc([[1,'1. Chapter',1]])
+        doc.save(pdf)
+    assert validate_pdf(pdf, book).status == 'valid'
+
+
+def test_lexical_hyphen_and_adjacent_note_marker_preserve_body_coverage(tmp_path):
+    source = tmp_path / 'chapter.xhtml'
+    book = BookModel('Book', 'pt-BR', (Chapter('a', 'Chapter', '<html><body><h1>Chapter</h1><p>A punição<a>1</a> pode reduzi-los.</p></body></html>', source),), (), ())
+    pdf = tmp_path / 'hyphen.pdf'
+    with pymupdf.open() as doc:
+        page = doc.new_page()
+        page.insert_text((72,72), 'Chapter\nA punição1 pode reduzi-\nlos.')
+        doc.set_toc([[1,'1. Chapter',1]])
+        doc.save(pdf)
+    assert validate_pdf(pdf, book).status == 'valid'
+
+
+@pytest.mark.renderer
+def test_inline_note_punctuation_is_not_reported_missing(tmp_path):
+    source = tmp_path / "chapter.xhtml"
+    source.write_text("")
+    book = BookModel("Book", "en", (Chapter("a", "Chapter", '<html><body><h1>Chapter</h1><p>Complete body.</p><aside>Alpha <em>beta</em>.</aside></body></html>', source),), (), ())
+    pdf = render_pdf(book, tmp_path / "note.pdf", PrintStyle())
+    assert validate_pdf(pdf, book).status == "valid"
+
+
+def test_title_and_outline_do_not_approve_missing_body(tmp_path):
+    source = tmp_path / "chapter.xhtml"
+    book = BookModel("Book", "en", (Chapter("a", "Chapter", '<html><body><h1>Chapter</h1><p>Essential substantive body completely absent.</p></body></html>', source),), (), ())
+    pdf = tmp_path / "incomplete.pdf"
+    with pymupdf.open() as doc:
+        page = doc.new_page()
+        page.insert_text((72, 72), "Chapter")
+        doc.set_toc([[1, "1. Chapter", 1]])
+        doc.save(pdf)
+    assert validate_pdf(pdf, book).status == "invalid"
+
+
+@pytest.mark.renderer
+def test_body_loss_requires_review_even_with_title_and_outline(tmp_path):
+    source = tmp_path / "chapter.xhtml"
+    source.write_text("")
+    html = '<html><body><h1>Chapter</h1><p>First complete paragraph with several words.</p><p>Second substantive paragraph was removed entirely.</p></body></html>'
+    expected = BookModel("Book", "en", (Chapter("a", "Chapter", html, source),), (), ())
+    actual = BookModel("Book", "en", (Chapter("a", "Chapter", html.replace('<p>Second substantive paragraph was removed entirely.</p>', ''), source),), (), ())
+    pdf = render_pdf(actual, tmp_path / "partial.pdf", PrintStyle())
+    assert validate_pdf(pdf, expected).status != "valid"
+
+
 @pytest.mark.renderer
 def test_validate_pdf_accepts_complete_textual_book(tmp_path: Path) -> None:
     book = make_print_book(tmp_path / "book")

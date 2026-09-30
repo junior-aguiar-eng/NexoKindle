@@ -14,6 +14,18 @@ from kindle_pdf.pipeline import ConvertOptions
 from tests.book_fixtures import make_text_epub
 
 
+def test_changed_windows_tool_invalidates_conversion_identity(tmp_path):
+    from kindle_pdf.pipeline import options_signature
+    tools = [tmp_path / name for name in ('archiver.exe', 'customize.exe', 'debug.exe', 'plugin.zip')]
+    for tool in tools:
+        tool.write_bytes(b"first tool")
+    adapter = WindowsKindleAdapter(archiver_exe=tools[0], calibre_customize_exe=tools[1], calibre_debug_exe=tools[2], kfx_input_zip=tools[3])
+    options = ConvertOptions(decrypt_adapter=adapter)
+    before = options_signature(options)
+    tools[3].write_bytes(b"changed plugin")
+    assert options_signature(options) != before
+
+
 def _protected_book(root: Path) -> Path:
     folder = root / "TESTBOOK_EBOK"
     folder.mkdir()

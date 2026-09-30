@@ -174,6 +174,16 @@ class WindowsKindleAdapter:
             return None
         return matches[0] / "LocalCache" / "Local" / "Microsoft" / "Crypto" / "PCPKSP"
 
+    def cache_identity(self) -> dict[str, str | None]:
+        """Identifica ferramentas da conversão sem incluir cache de chaves."""
+        paths = {
+            "archiver": self.archiver_exe,
+            "calibre_customize": self.calibre_customize_exe,
+            "calibre_debug": self.calibre_debug_exe,
+            "kfx_input": self.kfx_input_zip,
+        }
+        return {name: _sha256(path) if path.is_file() else None for name, path in paths.items()}
+
     def _preflight(self, source: Path) -> DecryptStatus | None:
         if sys.platform != "win32" or not source.parent.name.endswith("_EBOK"):
             return "unsupported"

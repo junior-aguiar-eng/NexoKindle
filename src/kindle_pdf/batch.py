@@ -9,7 +9,7 @@ import tempfile
 from typing import Callable
 
 from .detect import detect_book
-from .pipeline import PIPELINE_VERSION, ConversionResult, ConvertOptions, convert_one, options_signature
+from .pipeline import PIPELINE_VERSION, ConversionResult, ConvertOptions, convert_one, options_signature, input_identity
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +45,12 @@ def convert_batch(paths: list[Path], output_dir: Path, options: ConvertOptions,
         if should_cancel is not None and should_cancel():
             cancelled = True
             break
-        key_material = json.dumps([str(source), detection.sha256, signature, PIPELINE_VERSION],
+        try:
+            identity = input_identity(source, detection.sha256, detection.status == "protected_or_unreadable")
+        except OSError:
+            # convert_one classifica este item; o restante do lote continua.
+            identity = None
+        key_material = json.dumps([str(source), identity, signature, PIPELINE_VERSION],
                                   ensure_ascii=False, sort_keys=True)
         key = hashlib.sha256(key_material.encode("utf-8")).hexdigest()
         previous = records.get(key)
@@ -54,8 +59,9 @@ def convert_batch(paths: list[Path], output_dir: Path, options: ConvertOptions,
             detection.status == "protected_or_unreadable"
             and options.decrypt_adapter is not None and options.credential is not None
         )
-        if (isinstance(previous, dict) and resumable_input
+        if (isinstance(previous, dict) and resumable_input and identity is not None
                 and previous.get("input_sha256") == detection.sha256
+                and previous.get("input_identity") == identity
                 and previous.get("options") == signature
                 and previous.get("pipeline_version") == PIPELINE_VERSION
                 and previous.get("status") in {"converted", "review_required"}):
@@ -80,6 +86,7 @@ def convert_batch(paths: list[Path], output_dir: Path, options: ConvertOptions,
         results.append(result)
         artifact = result.pdf_path or result.review_path
         records[key] = {
+            "input_identity": identity,
             "input_sha256": result.sha256,
             "options": signature,
             "pipeline_version": PIPELINE_VERSION,
